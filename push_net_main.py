@@ -19,6 +19,8 @@ import os
 import config as args
 from img_utils import * ## utility function to manipulate images
 
+import argparse
+
 
 ''' Dimension of input image'''
 W = 128.0 ##!!!! Important to make it float to prevent integer division becomes zeros
@@ -37,7 +39,7 @@ METHOD = 'simcom' ## Original Push-Net
 ''' visualization options '''
 CURR_VIS = True # display current image
 NEXT_VIS = True # display target image
-SAMPLE_VIS = False # display all sampled actions
+SAMPLE_VIS = True # display all sampled actions
 BEST_VIS = True # display the best action
 
 
@@ -157,7 +159,7 @@ class Predictor:
 
 ''' Push Controller '''
 class PushController:
-    def __init__(self):
+    def __init__(self, test_im=None, goal_im=None):
         self.num_action = args.num_action
         self.bs = args.batch_size
         ''' goal specification '''
@@ -167,8 +169,13 @@ class PushController:
 
         ## instantiate Push-Net predictor
         self.pred = Predictor()
-        Ic = cv2.imread('test.jpg')[:,:,0]
-        self.get_best_push(Ic.copy())
+        if test_im is None:
+          Ic = cv2.imread('test_book.png')[:,:,0]
+          self.get_best_push(Ic.copy())
+        if goal_im is None:
+          self.get_best_push(test_im.copy())
+        else:
+          self.get_best_push(test_im.copy(), goal_im.copy())
 
 
     def sample_action(self, img, num_actions):
@@ -233,7 +240,7 @@ class PushController:
         return actions
 
 
-    def get_best_push(self, Ic):
+    def get_best_push(self, Ic, Gc=None):
         ''' Input:
                 Ic: current image mask
         '''
@@ -244,15 +251,21 @@ class PushController:
         ''' visualize current image '''
         if CURR_VIS:
             cv2.imshow('img', img_in_curr)
-            cv2.waitKey(0)
+            #cv2.waitKey(0)
 
         ''' generate goal image '''
-        img_in_next = generate_goal_img(img_in_curr.copy(), self.w, self.x, self.y)
+        img_in_next = None
+        if Gc is None:
+          img_in_next = generate_goal_img(img_in_curr.copy(), self.w, self.x, self.y)
+        else:
+          img_in_next = Gc.astype(np.uint8)
+
+        _, img_in_next = cv2.threshold(img_in_next.copy(), 30, 255, cv2.THRESH_BINARY)
 
         ''' visualize goal image '''
         if NEXT_VIS:
-            cv2.imshow('img', img_in_next)
-            cv2.waitKey(0)
+            cv2.imshow('goal', img_in_next)
+            #cv2.waitKey(0)
 
         ''' Sample actions '''
         actions = self.sample_action(img_in_curr.copy(), self.num_action)
@@ -299,6 +312,8 @@ class PushController:
         pack = action_value_pairs.pop(0)
         best_start = pack[0][0] ## best push starting pixel
         best_end = pack[0][1] ## best push ending pixel
+        print 'best_start ' + str(best_start[0]) + ' ' + str(best_start[1])
+        print 'best_end ' + str(best_end[0]) + ' ' + str(best_end[1])
 
         if BEST_VIS:
             self.draw_action(img_in_curr.copy(), best_start, best_end, single=True)
@@ -322,6 +337,8 @@ class PushController:
         ey = int(end[1])
 
         cv2.line(img_3d, (sx, sy), (ex, ey), (0,0,255), 3)
+        if single:
+          cv2.circle(img_3d, (sx, sy), 6, (80,0,255), -1)
         img_3d = img_3d.astype(np.uint8)
 
         cv2.imshow('action', img_3d)
@@ -333,7 +350,25 @@ class PushController:
             ## draw all sample actions
             cv2.waitKey(10)
 
+def get_args(argv=None):
+    parser = argparse.ArgumentParser('push_net')
+    parser.add_argument('--test-filename', dest='test_filename', type=str,
+                        help='Input image filename.')
+    parser.add_argument('--goal-filename', dest='goal_filename', type=str,
+                        help='Goal image filename')
+
+    args = parser.parse_args(argv)
+
+    in_img = None; gl_img = None;
+    if not args.test_filename is None:
+      print 'Input image: ' + args.test_filename
+      in_img = cv2.imread(args.test_filename)[:,:,0]
+    if not args.test_filename is None:
+      print 'Goal image: ' + args.goal_filename
+      gl_img = cv2.imread(args.goal_filename)[:,:,0]
+    return [in_img, gl_img]
 
 if __name__=='__main__':
-    con = PushController()
+    [in_img, gl_img] = get_args()
+    con = PushController(in_img, gl_img)
 
