@@ -24,6 +24,20 @@
   ```python push_net_main.py```
   
   result: the input image with the best action (red arrow) will be displayed
+
+
+## Docker
+Build the docker image
+
+```docker build -t d_push_net```
+
+Enable client hosts to connect to X server
+
+```xhost +```
+
+Run nvidia docker
+
+```nvidia-docker run -it -v /tmp/.X11-unix:/tmp/.X11-unix -v /home/<username>:/container -e DISPLAY=$DISPLAY --env QT_X11_NO_MITSHM=1 d_push_net```
   
 
 ## License and Citation
