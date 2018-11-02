@@ -128,7 +128,12 @@ class COM_net_sim(nn.Module):
         com_out = self.linear_com_out(lstm_out_unpad.contiguous().view(-1, HIDDEN_SIZE))
         fnext = self.linear_fnext_out(lstm_out_unpad.contiguous().view(-1, HIDDEN_SIZE))
 
-        print 'PushNet called'
+        #print 'PushNet called'
+        #print fnext
+        #print fnext[0]
+        #print f1
+        #print Ig.cpu().numpy()[0][0].shape
+        #print fnext.cpu().detach().numpy()
 
         ''' evaluate similarity between target internal state & true internal state'''
         output = self.linear_img_img(torch.abs(fnext - fg))

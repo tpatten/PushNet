@@ -363,7 +363,7 @@ def get_args(argv=None):
     if not args.test_filename is None:
       print 'Input image: ' + args.test_filename
       in_img = cv2.imread(args.test_filename)[:,:,0]
-    if not args.test_filename is None:
+    if not args.goal_filename is None:
       print 'Goal image: ' + args.goal_filename
       gl_img = cv2.imread(args.goal_filename)[:,:,0]
     return [in_img, gl_img]
