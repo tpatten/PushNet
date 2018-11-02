@@ -29,7 +29,7 @@
 ## Docker
 Build the docker image
 
-```docker build -t d_push_net```
+```docker build -t d_push_net .```
 
 Enable client hosts to connect to X server
 
@@ -38,6 +38,12 @@ Enable client hosts to connect to X server
 Run nvidia docker
 
 ```nvidia-docker run -it -v /tmp/.X11-unix:/tmp/.X11-unix -v /home/<username>:/container -e DISPLAY=$DISPLAY --env QT_X11_NO_MITSHM=1 d_push_net```
+
+If using PushNet in other python directories, must set the global PYTHONPATH variable
+
+```export PYTHONPATH=$PYTHONPATH:/container/<path_to_PushNet>```
+
+(Note: currently the docker file contains the path `/container/Code/PushNet`, change this line to automatically include path to PushNet on startup.)
   
 
 ## License and Citation

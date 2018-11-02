@@ -16,6 +16,8 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
 
     apt-get update && \
 
+    export PYTHONPATH="$PYTHONPATH:/container/Code/PushNet" && \
+
 # ==================================================================
 # tools
 # ------------------------------------------------------------------
