@@ -153,7 +153,7 @@ class Predictor:
 
 ''' Push Controller '''
 class PushController:
-    def __init__(self, test_im=None, goal_im=None, visualize=False):
+    def __init__(self, visualize=False):
         self.num_action = args.num_action
         self.bs = args.batch_size
         self.visualize = visualize
@@ -164,14 +164,7 @@ class PushController:
 
         ## instantiate Push-Net predictor
         self.pred = Predictor()
-        if test_im is None:
-            print "Input image is None"
-            return
-        if goal_im is None:
-            self.get_best_push(test_im.copy())
-        else:
-            self.get_best_push(test_im.copy(), goal_im.copy())
-
+        
     def sample_action(self, img, num_actions):
         ''' sample [num_actions] numbers of push action candidates from current img'''
         s = 0.9
@@ -236,7 +229,12 @@ class PushController:
     def get_best_push(self, Ic, Gc=None):
         ''' Input:
                 Ic: current image mask
+                Gc: goal image mask
         '''
+
+        if Ic is None:
+            print "Input image is None"
+            return None, None
 
         _, img_in_curr = cv2.threshold(Ic.copy(), 30, 255, cv2.THRESH_BINARY)
 
@@ -301,8 +299,8 @@ class PushController:
         pack = action_value_pairs.pop(0)
         best_start = pack[0][0] ## best push starting pixel
         best_end = pack[0][1] ## best push ending pixel
-        print 'best_start ' + str(best_start[0]) + ' ' + str(best_start[1])
-        print 'best_end ' + str(best_end[0]) + ' ' + str(best_end[1])
+        #print 'best_start ' + str(best_start[0]) + ' ' + str(best_start[1])
+        #print 'best_end ' + str(best_end[0]) + ' ' + str(best_end[1])
 
         if self.visualize:
             self.draw_action(img_in_curr.copy(), best_start, best_end, single=True)
@@ -310,8 +308,10 @@ class PushController:
         ''' execute action '''
         ## do whatever to execute push action (best_start, best_end)
 
+        return best_start, best_end
+
         ''' update LSTM hidden state '''
-        self.pred.update(best_start, best_end, img_in_curr, img_in_next)
+        #self.pred.update(best_start, best_end, img_in_curr, img_in_next)
 
     def draw_action(self, img, start, end, single=True):
         if self.visualize:

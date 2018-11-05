@@ -22,9 +22,15 @@ def get_args(argv=None):
 
 if __name__=='__main__':
     visualize = True
+
     in_img, gl_img = get_args()
     Ic = in_img.astype(np.uint8)
     Gc = None
     if gl_img is not None:
       Gc = gl_img.astype(np.uint8)
-    con = PushController(Ic, Gc, visualize)
+
+    con = PushController(visualize)
+    best_start, best_end = con.get_best_push(Ic, Gc)
+
+    print 'best_start ' + str(best_start[0]) + ' ' + str(best_start[1])
+    print 'best_end ' + str(best_end[0]) + ' ' + str(best_end[1])
