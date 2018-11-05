@@ -32,15 +32,9 @@ H = 106.0
 MODE = 'wxy' ## uncomment this line if care both re-position and re-orient an object
 
 ''' Method for comparison '''
-METHOD = 'simcom' ## Original Push-Net
+#METHOD = 'simcom' ## Original Push-Net
 #METHOD = 'sim' ## Push-Net without estimating COM
-#METHOD = 'nomem' ## Push-Net without LSTM
-
-''' visualization options '''
-CURR_VIS = True # display current image
-NEXT_VIS = True # display target image
-SAMPLE_VIS = True # display all sampled actions
-BEST_VIS = True # display the best action
+METHOD = 'nomem' ## Push-Net without LSTM
 
 
 def to_var(x, volatile=False):
@@ -159,9 +153,10 @@ class Predictor:
 
 ''' Push Controller '''
 class PushController:
-    def __init__(self, test_im=None, goal_im=None):
+    def __init__(self, test_im=None, goal_im=None, visualize=False):
         self.num_action = args.num_action
         self.bs = args.batch_size
+        self.visualize = visualize
         ''' goal specification '''
         self.w = 30 # orientation in degree (positive in counter clockwise direction)
         self.x = 10 # x direction translation in pixel (horizontal axis of image plane)
@@ -170,13 +165,12 @@ class PushController:
         ## instantiate Push-Net predictor
         self.pred = Predictor()
         if test_im is None:
-          Ic = cv2.imread('test_book.png')[:,:,0]
-          self.get_best_push(Ic.copy())
+            print "Input image is None"
+            return
         if goal_im is None:
-          self.get_best_push(test_im.copy())
+            self.get_best_push(test_im.copy())
         else:
-          self.get_best_push(test_im.copy(), goal_im.copy())
-
+            self.get_best_push(test_im.copy(), goal_im.copy())
 
     def sample_action(self, img, num_actions):
         ''' sample [num_actions] numbers of push action candidates from current img'''
@@ -239,39 +233,34 @@ class PushController:
 
         return actions
 
-
     def get_best_push(self, Ic, Gc=None):
         ''' Input:
                 Ic: current image mask
         '''
-        img_in_curr = Ic.astype(np.uint8)
 
-        _, img_in_curr = cv2.threshold(img_in_curr.copy(), 30, 255, cv2.THRESH_BINARY)
+        _, img_in_curr = cv2.threshold(Ic.copy(), 30, 255, cv2.THRESH_BINARY)
 
         ''' visualize current image '''
-        if CURR_VIS:
+        if self.visualize:
             cv2.imshow('img', img_in_curr)
-            #cv2.waitKey(0)
 
         ''' generate goal image '''
-        img_in_next = None
         if Gc is None:
-          img_in_next = generate_goal_img(img_in_curr.copy(), self.w, self.x, self.y)
+            img_in_next = generate_goal_img(img_in_curr.copy(), self.w, self.x, self.y)
         else:
-          img_in_next = Gc.astype(np.uint8)
+            img_in_next = Gc.copy()
 
         _, img_in_next = cv2.threshold(img_in_next.copy(), 30, 255, cv2.THRESH_BINARY)
 
         ''' visualize goal image '''
-        if NEXT_VIS:
+        if self.visualize:
             cv2.imshow('goal', img_in_next)
-            #cv2.waitKey(0)
 
         ''' Sample actions '''
         actions = self.sample_action(img_in_curr.copy(), self.num_action)
 
         ''' visualize sampled actions '''
-        if SAMPLE_VIS:
+        if self.visualize:
             for i in range(len(actions)/4):
                 start = [actions[i*4], actions[i*4+1]]
                 end = [actions[i*4+2], actions[i*4+3]]
@@ -315,59 +304,36 @@ class PushController:
         print 'best_start ' + str(best_start[0]) + ' ' + str(best_start[1])
         print 'best_end ' + str(best_end[0]) + ' ' + str(best_end[1])
 
-        if BEST_VIS:
+        if self.visualize:
             self.draw_action(img_in_curr.copy(), best_start, best_end, single=True)
 
         ''' execute action '''
-        ## TODO: do whatever to execute push action (best_start, best_end)
+        ## do whatever to execute push action (best_start, best_end)
 
         ''' update LSTM hidden state '''
         self.pred.update(best_start, best_end, img_in_curr, img_in_next)
 
-
     def draw_action(self, img, start, end, single=True):
+        if self.visualize:
+            (yy, xx) = np.where(img>0)
+            img_3d = np.zeros((int(H), int(W), 3))
+            img_3d[yy, xx] = np.array([255,255,255])
 
-        (yy, xx) = np.where(img>0)
-        img_3d = np.zeros((int(H), int(W), 3))
-        img_3d[yy, xx] = np.array([255,255,255])
+            sx = int(start[0])
+            sy = int(start[1])
+            ex = int(end[0])
+            ey = int(end[1])
 
-        sx = int(start[0])
-        sy = int(start[1])
-        ex = int(end[0])
-        ey = int(end[1])
+            cv2.line(img_3d, (sx, sy), (ex, ey), (0,0,255), 3)
+            if single:
+              cv2.circle(img_3d, (sx, sy), 6, (80,0,255), -1)
+            img_3d = img_3d.astype(np.uint8)
 
-        cv2.line(img_3d, (sx, sy), (ex, ey), (0,0,255), 3)
-        if single:
-          cv2.circle(img_3d, (sx, sy), 6, (80,0,255), -1)
-        img_3d = img_3d.astype(np.uint8)
-
-        cv2.imshow('action', img_3d)
-        if single:
-            ## draw the best action
-            print 'press any key to continue ...'
-            cv2.waitKey(0)
-        else:
-            ## draw all sample actions
-            cv2.waitKey(10)
-
-def get_args(argv=None):
-    parser = argparse.ArgumentParser('push_net')
-    parser.add_argument('--test-filename', dest='test_filename', type=str,
-                        help='Input image filename.')
-    parser.add_argument('--goal-filename', dest='goal_filename', type=str,
-                        help='Goal image filename')
-
-    args = parser.parse_args(argv)
-
-    in_img = None; gl_img = None;
-    if not args.test_filename is None:
-      print 'Input image: ' + args.test_filename
-      in_img = cv2.imread(args.test_filename)[:,:,0]
-    if not args.goal_filename is None:
-      print 'Goal image: ' + args.goal_filename
-      gl_img = cv2.imread(args.goal_filename)[:,:,0]
-    return [in_img, gl_img]
-
-#if __name__=='__main__':
-#    [in_img, gl_img] = get_args()
-#    con = PushController(in_img, gl_img)
+            cv2.imshow('action', img_3d)
+            if single:
+                ## draw the best action
+                print 'press any key to continue ...'
+                cv2.waitKey(0)
+            else:
+                ## draw all sample actions
+                cv2.waitKey(10)
