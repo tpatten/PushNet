@@ -251,7 +251,7 @@ class PushController:
         '''
 
         if Ic is None:
-            print "Input image is None"
+            print 'Input image is None'
             return None, None
 
         _, img_in_curr = cv2.threshold(Ic.copy(), 30, 255, cv2.THRESH_BINARY)
@@ -340,7 +340,7 @@ class PushController:
 
             cv2.line(img_3d, (sx, sy), (ex, ey), (0,0,255), 3)
             if single:
-              cv2.circle(img_3d, (sx, sy), 6, (80,0,255), -1)
+                cv2.circle(img_3d, (sx, sy), 6, (80,0,255), -1)
             img_3d = img_3d.astype(np.uint8)
 
             cv2.imshow('action', img_3d)
