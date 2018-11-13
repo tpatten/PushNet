@@ -16,7 +16,7 @@ from torch.autograd import Variable
 import numpy as np
 import os
 
-import config as args
+#import config as args
 from img_utils import * ## utility function to manipulate images
 
 import argparse
@@ -29,12 +29,19 @@ H = 106.0
 ''' Mode of Goal Configuration Specification'''
 #MODE = 'xy' ## uncomment this line if you only care how to re-position an object
 #MODE = 'w' ## uncomment this line if you only care how to re-orient an object
-MODE = 'wxy' ## uncomment this line if care both re-position and re-orient an object
+#MODE = 'wxy' ## uncomment this line if care both re-position and re-orient an object
 
 ''' Method for comparison '''
 #METHOD = 'simcom' ## Original Push-Net
 #METHOD = 'sim' ## Push-Net without estimating COM
-METHOD = 'nomem' ## Push-Net without LSTM
+#METHOD = 'nomem' ## Push-Net without LSTM
+
+### three different network architecture for comparison
+arch = {
+        'simcom':'push_net',
+        'sim': 'push_net_sim',
+        'nomem': 'push_net_nomem'
+       }
 
 
 def to_var(x, volatile=False):
@@ -44,10 +51,11 @@ def to_var(x, volatile=False):
 
 '''deep neural network predictor'''
 class Predictor:
-    def __init__(self):
-        self.bs = args.batch_size
-        model_path = 'model'
-        best_model_name = args.arch[METHOD] + '.pth.tar'
+    def __init__(self, batch_size, model_path, mode, net_method):
+        self.bs = batch_size
+        self.mode = mode
+        self.net_method = net_method
+        best_model_name = arch[self.net_method] + '.pth.tar'
         self.model_path = os.path.join(model_path, best_model_name)
         self.model = self.build_model()
         self.load_model()
@@ -59,11 +67,11 @@ class Predictor:
         self.model.eval()
 
     def build_model(self):
-        if METHOD == 'simcom':
+        if self.net_method == 'simcom':
             return COM_net_sim(self.bs)
-        elif METHOD == 'sim':
+        elif self.net_method == 'sim':
             return COM_net_sim_only(self.bs)
-        elif METHOD == 'nomem':
+        else:
             return COM_net_nomem(self.bs)
 
     def reset_model(self):
@@ -93,11 +101,11 @@ class Predictor:
         I1 = to_var(I1)
         Ig = to_var(Ig)
 
-        if METHOD == 'simcom':
+        if self.net_method == 'simcom':
             sim_out, com_out = self.model(A1, I1, A1, Ig, [1 for i in range(bs)], bs)
-        elif METHOD == 'sim':
+        elif self.net_method == 'sim':
             sim_out = self.model(A1, I1, A1, Ig, [1 for i in range(bs)], bs)
-        elif METHOD == 'nomem':
+        else:
             sim_out = self.model(A1, I1, A1, Ig, [1 for i in range(bs)], bs)
 
     def evaluate_action(self, img_curr, img_goal, actions):
@@ -126,18 +134,18 @@ class Predictor:
         sim_out = None
         com_out = None
 
-        if METHOD == 'simcom':
+        if self.net_method == 'simcom':
             sim_out, com_out = self.model(A1, I1, A1, Ig, [1 for j in range(bs)], bs)
-        elif METHOD == 'sim':
+        elif self.net_method == 'sim':
             sim_out = self.model(A1, I1, A1, Ig, [1 for j in range(bs)], bs)
-        elif METHOD == 'nomem':
+        else:
             sim_out = self.model(A1, I1, A1, Ig, [1 for j in range(bs)], bs)
 
         sim_np = sim_out.data.cpu().data.numpy()
 
-        if MODE == 'wxy':
+        if self.mode == 'wxy':
             sim_sum = np.sum(sim_np, 1) # measure (w ,x, y)
-        elif MODE == 'xy':
+        elif self.mode == 'xy':
             sim_sum = np.sum(sim_np[:,1:], 1) # measure (x, y)
         else:
             sim_sum = sim_np[:, 0] # measure (w)
@@ -153,17 +161,27 @@ class Predictor:
 
 ''' Push Controller '''
 class PushController:
-    def __init__(self, visualize=False):
-        self.num_action = args.num_action
-        self.bs = args.batch_size
+    def __init__(self, num_action, batch_size, model_path='model', mode='wxy', net_method='sim', visualize=False):
+        self.num_action = num_action
+        self.bs = batch_size
+        self.net_method = net_method
         self.visualize = visualize
+        ''' check inputs '''
+        valid_mode = mode # must be 'xy', 'w' or 'wxy'
+        if mode != 'xy' and mode != 'w' and mode != 'wxy':
+          print 'Invalid mode', mode
+          valid_mode = 'wxy'
+        self.net_method = net_method # must be 'simcom', 'sim' or 'nomem'
+        if net_method != 'simcom' and net_method != 'sim' and net_method != 'nomem':
+          print 'Invalid method', net_method
+          self.net_method = 'sim'
         ''' goal specification '''
         self.w = 30 # orientation in degree (positive in counter clockwise direction)
         self.x = 10 # x direction translation in pixel (horizontal axis of image plane)
         self.y = -10 # y direction translation in pixel (vertical axis of image plane)
 
         ## instantiate Push-Net predictor
-        self.pred = Predictor()
+        self.pred = Predictor(self.bs, model_path, valid_mode, self.net_method)
         
     def sample_action(self, img, num_actions):
         ''' sample [num_actions] numbers of push action candidates from current img'''
@@ -260,9 +278,7 @@ class PushController:
         ''' visualize sampled actions '''
         if self.visualize:
             for i in range(len(actions)/4):
-                start = [actions[i*4], actions[i*4+1]]
-                end = [actions[i*4+2], actions[i*4+3]]
-                self.draw_action(img_in_curr.copy(), start, end, single=False)
+                self.draw_action(img_in_curr.copy(), [actions[i*4], actions[i*4+1]], [actions[i*4+2], actions[i*4+3]], single=False)
 
         ''' Select actions '''
         num_action = len(actions) / 4
@@ -277,7 +293,7 @@ class PushController:
         action_batch = []
         hidden = None
 
-        if not METHOD == 'nomem':
+        if self.net_method == 'simcom' or self.net_method == 'sim':
             hidden = self.pred.model.hidden
 
         action_value_pairs = []
@@ -299,8 +315,6 @@ class PushController:
         pack = action_value_pairs.pop(0)
         best_start = pack[0][0] ## best push starting pixel
         best_end = pack[0][1] ## best push ending pixel
-        #print 'best_start ' + str(best_start[0]) + ' ' + str(best_start[1])
-        #print 'best_end ' + str(best_end[0]) + ' ' + str(best_end[1])
 
         if self.visualize:
             self.draw_action(img_in_curr.copy(), best_start, best_end, single=True)
