@@ -11,8 +11,6 @@ import numpy as np
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
-import config as args
-
 WIDTH = 128
 HEIGHT = 106
 
@@ -127,13 +125,6 @@ class COM_net_sim(nn.Module):
 
         com_out = self.linear_com_out(lstm_out_unpad.contiguous().view(-1, HIDDEN_SIZE))
         fnext = self.linear_fnext_out(lstm_out_unpad.contiguous().view(-1, HIDDEN_SIZE))
-
-        #print 'PushNet called'
-        #print fnext
-        #print fnext[0]
-        #print f1
-        #print Ig.cpu().numpy()[0][0].shape
-        #print fnext.cpu().detach().numpy()
 
         ''' evaluate similarity between target internal state & true internal state'''
         output = self.linear_img_img(torch.abs(fnext - fg))
@@ -265,10 +256,6 @@ class COM_net_nomem(nn.Module):
 def get_num_parameters(model):
     model_parm = filter(lambda p:p.requires_grad, model.parameters())
     return sum([np.prod(p.size()) for p in model_parm])
-
-if __name__=='__main__':
-    net = COM_net_sim(args.batch_size)
-    print get_num_parameters(net)
 
 
 

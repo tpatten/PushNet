@@ -3,7 +3,7 @@ Main program to push objects
 
 '''
 
-__author__='Li Juekun'
+__author__= 'Li Juekun'
 __date__ = '2018/07/25'
 
 ## pytorch mods ##
